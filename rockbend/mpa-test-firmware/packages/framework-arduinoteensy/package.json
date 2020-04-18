@@ -1,0 +1,7 @@
+{
+    "name": "framework-arduinoteensy",
+    "description": "Arduino Wiring-based Framework (Teensy Core)",
+    "system": "*",
+    "url": "https://github.com/PaulStoffregen/cores",
+    "version":"1.151.0"
+}

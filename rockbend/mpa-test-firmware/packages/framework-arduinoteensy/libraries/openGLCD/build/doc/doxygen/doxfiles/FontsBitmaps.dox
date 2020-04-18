@@ -1,0 +1,178 @@
+/*
+ * openGLCD library Font and Bitmap documenation
+ */
+
+/**
+@page page_FontsBitmaps Fonts and Bitmaps
+
+While the openGLCD library distribution comes with a few fonts and bitmaps, 
+the library supports user defined custom fonts and bitmaps.
+Additional fonts and bitmaps can be added.
+To see which fonts come with the distribution see the file
+fonts/allFonts.h
+The name of each available font matches the name of each of the .h header files.
+
+@subpage page_Fonts
+
+@subpage page_Bitmaps
+
+*/
+
+/**
+@page page_Fonts Using Fonts
+
+There is a free java application available (openGLCDFontCreator) that can convert PC fonts for use with this library. 
+
+<H1>
+Using openGLCDFontCreator
+</H1>
+
+openGLCDFontCreator is modified version of GLCDFontCreator2
+that can produce a header file suitable for directly using with the library.
+
+@note
+openGLCDFontCreator & GLCDFontCreator2 should not be confused with GLCD FontCreator 1.1 mikroElektronica Edition, 
+which is an entirely different product/tool. GLCDFontCreator2 is a free open source Java based application
+while GLCD FontCreator 1.1 is a Windows based font tool for use with microElectronica s/w products.
+The mikroElektronica Edition s/w encodes the font data differently and the free
+version of the software does not allow saving a full character set.
+
+Here is a link to a zip image for openGLCDFontCreator: <a href="https://bitbucket.org/bperrybap/openglcd/downloads/openGLCDFontCreator.zip">openGLCDFontCreator Zip Image</a>
+
+To create a font click on [File]->[New Font]
+Type in the name of the font in the Name box that says "new Font".
+This will be the name you use for the @ref gText::SelectFont() "SelectFont()" api call.\n
+DO NOT use spaces in the name.\n
+Example:
+@image html openGLCDFontCreator-Newfont.png
+
+If you do not wish to create an entire font yourself, you can
+import a font from one of the system fonts available by choosing a font
+from the [Import Font] drop down box.
+The size is a font size and not a height in pixels. Because of this
+you may have to play with the size a bit to get a font of the desired pixel height
+or one that is close to the size you want as not all pixel heights are possible.
+@note You can only specify the size of the font when you import it. So
+if you decide to change sizes, you must start over by creating a new font and re-importing
+the font.
+
+When you are ready to create the .h file, simply click on [Export]->[Export Font]
+and type in the name of the .h file in the File Name box.
+For consistency it is highly recommended that you name the .h the same as the font name.
+DO NOT use spaces in the name.\n
+Example:
+@code
+myfont.h
+@endcode
+
+The font header files must be placed in the fonts directory.
+For example, if you create a font named @em myfont in a header named @em myfont.h then copy @em myfont.h
+to the fonts directory.
+
+The distribution contains a file named @em allFonts.h in the fonts directory
+that automatically includes all the distributed fonts
+to make them available for use by sketches.
+
+In order to make newly created fonts "known" by the library and sketches,
+the header file not only not has to be copied to the fonts directory
+but there must also be an include for that header file placed the allFonts.h file.
+
+Once this is done, sketches will be able to use the font by simply selecting it.
+Example:
+@code
+    GLCD.SelectFont(myfont);
+@endcode
+
+If other font generation tools are used, the font header file may need to be modified
+to work with the library.\n
+Have a look at other font header files to see the general format.\n
+The font header file must contain a gaurd ifdef\n
+The font header must not include any other header files.\n
+The font header should use the GLCDFONTDECL() macro to declare the font.
+
+Font definitions are stored in program memory and this can be significant
+for larger fonts. The 7 pixel high system font uses under 500 bytes,
+the supplied Arial14 font uses 1200 bytes of program memory.
+
+Here are some links to additional free fonts that can be downloaded:
+
+Pixel/Bitmap fonts: <a href="http://www.1001freefonts.com/bitmap-pixel-fonts.php">1001 Free Fonts</a>\n
+Pixel/Bitmap fonts: <a href="http://www.fonts2u.com/index.html">FONTs2U</a>\n
+Pixel/Bitmap as well as Dingbat fonts: <a href="http://www.dafont.com/bitmap.php">dafonts</a>
+
+A few tips to keep in mind is that not all the characters have to saved. You can save
+only a portion or range of the characters. This can be very useful to save
+memory space if all you need is numbers.
+Or in some cases fonts may contain characters that can be used as icons or tiny bitmaps.
+This is particularly true of many of the digbat fonts on the
+<a href="http://www.dafont.com/bitmap.php">dafonts</a>
+site.
+
+
+*/
+
+
+/**
+@page page_Bitmaps Using Bitmaps
+You can use the distributed bitmaps or create your own. 
+
+There are two utilities located in bitmaps/utils to convert
+bitmap files to files that can be used by your sketch.
+
+- bmp2glcd
+- glcdMakeBitmap
+
+bmp2glcd is a commandline tool.
+
+glcdMakeBitmap is a utility written in the Processing language;
+However, a java version of the utilty is also provided.
+
+glcdMakeBitmap converts a gif,
+jpg, bmp, tga or png file to a header file that can be used by your sketch.
+
+The Processing file glcdMakeBitmap.pde located in the glcdMakeBitmap subdirectory runs
+in the Processing environment on your computer - its not an Arduino sketch.
+See: http://processing.org/
+
+The java runtime (glcdMakeBitmap.jar) and java source (glcdMakeBitmap.java) are located
+in the Java subdirectory.
+
+Run glcdMakeBitmap by either running the java jar file directly or loading the pde file into Processing.
+
+@image html glcdMakeBitmap.png
+
+Drop the image file to be converted into the window.
+If the image can be converted, the image will be displayed in the window
+and a header file is created in the bitmaps directory.
+For example, if the image file name to be converted is named image.bmp, the header is named image.h
+
+To use the newly created bitmap, the aggregate header file (named allBitmaps.h) must
+be updated.
+Add the following line to to the allbitmaps.h header file in the bitmaps directory:
+@code
+#include "image.h"
+@endcode
+
+Alternatively, 
+glcdMakeBitmap can also update the aggregate header file automatically.
+To update allBitmaps.h to include all header files in the bitmap directory, click the window.
+
+Once the allbitmaps.h header has been updated, the sketch
+can display the image using the following code:
+@code
+  GLCD.DrawBitmap(image, x, y);
+@endcode
+where x and y are the desired location of the upper left edge of the bitmap.
+@note
+Do not include the bitmap header in the sketch.
+
+<h2>
+Bitmap Data Storage
+</h2>
+
+Images are stored in program memory, a 128x64 pixel image takes 1k bytes of flash.
+Bear in mind that each different image used in a sketch will reduce the amount of
+code in a sketch. The glcdMakeBitmap displays the amount of
+memory required for the image and other useful information when it does the conversion. 
+
+*/

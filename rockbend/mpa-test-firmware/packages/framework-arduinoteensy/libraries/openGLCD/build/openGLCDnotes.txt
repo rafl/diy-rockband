@@ -1,0 +1,769 @@
+vi:ts=4
+
+---------------------------------------------------------------------------
+include tree:
+
+openGLCD.h
+	#include <include/glcd_types.h>
+	#include <include/glcd.h>
+	#include <include/glcd_errno.h>
+	#include <openGLCD_Buildinfo.h>
+
+include/glcd.h
+	#include <inttypes.h>
+	#include "openGLCD_Config.h"
+	#include "include/gText.h" 
+
+	needs:
+		gText class (it inherits)
+			- needs glcd_Device (it inherits)
+
+		glcd_device defines:
+			- PIXEL_OFF, PIXEL_ON
+
+		GLCDCFG_GLCDCONFIG panel defines
+			- DISPLAY_WIDTH
+			- DISPLAY_HEIGHT
+
+include/gText.h
+	#include <inttypes.h>
+	#include "WString.h"
+	#include "openGLCD_Config.h"
+	#include "include/glcd_types.h"
+	#include "include/glcd_Device.h"
+
+	gText class needs:
+		panel defines from GLCDCFG_GLCDCONFIG
+			- DISPLAY_WIDTH
+			- DISPLAY_HEIGHT
+		glcd_Device class (it inherits!!!!!)
+
+
+openGLCD_Config.h
+	no includes, only defines
+	defines GLCD_GLCDCONFIG
+
+GLCD_GLCDCONFIG panel config file (assuming auto-pin-config)
+	#include AutoPinConfig_XXX.h
+	#include "device/XXX_device.h>
+
+	needs:
+
+
+AutoPInConfig_XXX.h
+	no includes only defines
+
+device/XXX_device.h
+
+	needs:
+		all config pin defines (from GLCD_GLCDCONFIG and AutoPinConfig_XXX.h)
+		all macros from glcd_io.h
+
+
+include/glcd_Device.h
+	#include "openGLCD_Config.h"
+	#include "include/glcd_types.h"
+	#include "include/glcd_io.h"
+
+	needs:
+		glcd_CHIP_COUNT (from panel files like GLCDCFG_GLCDCONFIG)
+
+include/glcd_io.h
+	#include "include/glcd_arduino_io.h"    // macros map arduino pins & set CORE defines
+	#include GLCDCFG_GLCDCONFIG				// include glcd panel config file
+	#include "include/avrio.h"         // these macros do AVR direct port io    
+
+include/glcd_arduino_io.h
+	#include "pins_arduino.h" // comes from Arduino core/variant 
+
+
+glcd.cpp
+	#include "include/glcd.h"
+
+gText.cpp
+	#include "include/gText.h"
+	#include "include/glcd_errno.h"
+
+glcd_Device.cpp
+	#include "include/glcd_Device.h"
+	#include "include/glcd_errno.h"
+
+	needs macros from
+		- device/XXX_device.h
+		- glcd_io.h
+---------------------------------------------------------------------------
+Two ways to handle PIN_An issue starting in IDE 1.6.10
+Either put in ifdefs in multiple places to ensure that i/o macros like avrio
+are never included when openGLCD.h is included
+OR
+put ifdefs into glcd_arduino_io.h
+
+Both are VERY ugly hacks.
+
+The first one requires knowledge of this across multiple files:
+- glcd_Device.h
+
+#ifdef __openGLCD_H__
+#include GLCDCFG_GLCDCONFIG
+#else
+#include "include/glcd_io.h"
+#endif
+
+- avrio.h
+
+#undef PIN_A0
+#undef PIN_A1
+#undef PIN_A2
+#undef PIN_A3
+#undef PIN_A4
+#undef PIN_A5
+#undef PIN_A6
+#undef PIN_A7
+
+
+- every single panel file
+
+#ifndef __openGLCD_H__
+#include "AutoPinConfig_ks0108.h" 
+#include "device/ks0108_Device.h"
+#endif
+
+- GLCDdiags.pde (really ugly as it has to play many games to trick includes)
+
+#define GLCD_H
+#include <openGLCD.h>
+#undef __openGLCD_H__
+#undef GLCD_H
+#include <include/glcd.h>
+
+The 2nd one puts it all into glcd_arduino_io.h
+The really ugly part of this method is that the avrio macros
+are total crap for the PIN_A0 to PIN_A7 pins and won't work for the applications
+since the Arduino PIN_A0 to PIN_A7 values will be used inside the sketch.
+This will only affect sketches that attempt to use avrio raw port macros with the
+PIN_A0 to PIN_A7 pins.
+
+---------------------------------------------------------------------------
+
+1.0 release fixes:
+
+- add includes=openGLCD.h to library.properties
+(see new 1.5x library spec for IDE 1.6.10 release)
+
+- change over to using AVRPIN_Pb for raw AVR pins.
+The old PIN_Pb defines can be left in for backward compability but this will
+ensure no issues with the new Arduino 1.6.10 PIN_An defines.
+This has MASSIVE ripple effects since it affects:
+- all pin config files.
+- GLCDdiags output
+- documentation
+
+- consider inserting links to a static web hosting for documenation in all examples
+
+- fix the html/doxygen documenation for the GLCD control/glcd_device functions.
+For some reason in the newest doxygen, you don't automatically get the hyperlinks anymore.
+
+- add a way to read current row and col using GetAreaProp()
+This will not work correctly with proportional fonts.
+
+- update ks0108 html wiring section to include how to wire up backlight
+transistor
+
+- think about changing FORCE_CORECODE mode.
+It might be useful to force core code mode but still use
+the board specific pin config file.
+currently it also forces the use of the "corecode" pin config file.
+Maybe there needs to be 2 seperate defines?
+
+- update documentation for CoreCode mode.
+This includes the wiring table and config file documenation.
+Perhaps intruduce the term "board specific" configuration vs "generic" or "corecode".
+This is affect by the force corecode decision above
+
+
+==============================================================================
+
+- 1.6.5 IDE supports local HTML consider using it for local documenation
+Unfortunately the path is chrooted so you can't get to directories above
+where the sketch lives
+
+
+- modify build script to work even if not using a git tree
+	Should be able to just check for .git file and then make up
+	version stuff if it doesn't exist.
+
+- Create a "known issues" "file" that can be read into doxygen as well
+	- Streaming support is no longer included in the library.
+		users that wish to use stream must install Mikal Hart's Streaming library:
+			http://arduiniana.org/libraries/streaming
+			
+	- Some cores only work on 1.x+
+		- mighty1284p 
+			Because they don't include support for pre 1.x IDE
+		- Leonardo
+	- pre 0019 IDE is no longer supported
+		to simplify the openglcd API and make it consistent across pre/post 1.x,
+		no support for pre 0019
+		- before 0019 the analog pin constants didn't exist
+		- before 0019 the String class didn't exist.
+	- 0019,0020,0021, 0022, 0023 pre 1.x IDEs won't work with newer avr-libC
+		Header file nightmares! 
+		 (new <util/delay.h> uses math.h )
+			- comment out #include <avr/delay.h> in wiring_private.h
+				(none of the core code uses/needs it)
+			OR if wanting to make util/delay functions available:
+			- must add #include <math.h> to top of wiring.h
+				wiring.h #defines the math functions and breaks math.h
+				math.h must be included before defines stomp on math functions
+
+	- chipKIT MPIDE issues
+		- with recent drop of plib support, openGLCD now no longer supports
+			MPIDE versions prior to 0023 2013-07-15
+		- has #error in <avr/pgmspace.h> down in compiler tools
+			hardware/pic32/compiler/pic32-tools/pic32mx/include/avr/pgmspace.h
+			all the pgmspace types/defines should be in pgmspacd.h not wiring.h
+			wiring.h should then include <avr/pgmspace.h>  if necessary
+			Best option would be to create a avr directory under the core library
+			and put a pgmspace.h there with all the AVR mappings and 
+			leave the one with the #error down in the compiler tools alone.
+			The new pgmspace.h will override the one down in the compiler tools
+			and that will offer AVR compatiblity for Arduno environment.
+		- missing
+			- PGM_P
+				#define PGM_P const char *
+			- PSTR()
+				#define PSTR(s) ((const char *)(s))
+
+	- GLCD_Bigdemo does not fit on Leonardo
+		(GLCDv3 version fits, openGLCD version does not)
+
+	- potential duplicate declarations of fonts & bitmaps
+		Currently if a font header or bitmap header is used in seperate
+		seperate compilation units, there will be duplicate data.
+		In Arduino all modules are combined by the IDE into a single .cpp so
+		that while the seperate "modules" may include a font or bitmap header
+		again, the gaurd ifdefs will prevent its actual inclusion.
+		If the IDE is not being used there is the potential that multiple
+		data declarations happens.
+		The long term strategy to address this is to have a .cpp file that
+		includes the allFonts and allBitmaps files for the data declarations.
+		the allbitmaps.h and allFonts.h files will use an ifdef to determine
+		whether to include the fonts or to just declare extern references to
+		the objects.
+		There will be no impact to any user code.
+		It will impact the JAVA tool that creates the allBitmaps.h header file.
+
+- support sketch pin configuration.
+	possible:
+		glcdio_xxx() becomes either a function or a macro.
+		The current glcd__xxx() macro mappings need to reference _glcdio_xxx()
+		that way the glcd_xxx() functions can use the _glcdio_xxx() macros.
+		So the top level glcdio_xxx() "functions" are either a macro that call _glcdio_xxx()
+		or a function that also calls _glcdio_xxx().
+
+- consider adding a "libinfo" sketch
+	This can print out all the openGLCD libary information
+	like diags does but not require any GLCD hardware.
+	It could also print out the exact config file in use
+	as well as the exact location of the html documentation
+	or even a file://xxxxx line that can be cut & pasted into
+	the browser.
+	OR maybe just added to diags?
+
+- create glcd types to replace PSTR and PGM_P
+	 so that mainline code does not depend on proprietary types.
+
+- Rendering issues for fixed witdh fonts smaller than 7/8 bits tall (in bitbucket)
+	- inverse is messed up.
+	- examine newbasic3x5 & Wendy3x5
+
+- fix hd44102 autoconfig file to use its own pin config rather than ks0108
+
+- build change (consider)
+	Consider having "readme" in VCS be a readme for openGLCD
+	Have the build script create
+		- openGLCD/doc all of it
+		- openGLCD/readme.txt (which overwrites the VCS readme).
+
+		The build script would copy files from a "release" area that includes
+			doc/*
+				html stuff
+			ReadMe.txt at root
+			ReleaseNotes.txt at root
+		It would be a directory tree for each type of release
+		"Arduino" being the only one right now.
+			
+
+- New Demos
+	-iFPS (iFPS demo - NEW)
+	-cp437 font example (done)
+	-openGLCDGraphics (done)
+		called "GraphicAPI"
+	-openGLCDText
+
+- update doxgen for backlight functions to indicate that
+  backlight must be configured in config files.
+
+- update doxygen for how to install???
+This makes more sense when documenation is hosted on line
+since you can read the documenation without having to install the s/w.
+
+- Update diags text output in doxygen (to show new version info)
+
+- need to add GLCD.top & GLCD.Left to coordinate system photo
+	Pretty much need to update/replace all photos in doxygen
+
+- need to add example of wiring up using real datasheet.
+	- need to mention active low vs active high chip select signals
+
+- Remove FontCallback routine
+
+- look at pin order of config files
+	- Teensy vs others
+	- consistency of CSEL3 & CSEL4
+	- Should pin order match pin configuration table order in doxygen? 
+
+- add API examples:
+    - Text
+		low
+			Printf_P
+			EraseTextLine
+			DrawSring_P
+			printFlash ??
+			printFlashln ??
+			printNumber ??
+			Puts_P
+			Streaming i/o (done)
+
+	- Graphics
+		low
+			-DrawBitmapXBM_P
+    - Device
+		low priority
+			- GotoXY
+			- ReadData
+			- WriteData
+
+- Nano & Micro have their own variants
+	- have seperate pinconfig files?
+	- nano is m328 variant same as "standard" but defines 8 analog pins
+	- micro is 32u4 variant same as "leonardo" except LED definitions.
+
+- change checks for pin/feature support.
+	- instead of checking for pin definition,
+	  change glcdio to define/not-define "function" macro based on
+	  pin defintion, then have mainline code check for existence
+	  of "function" macro vs checking for pin definition.
+
+- move LCD_OFF checks & code to glcdio and new glcdio  "function" macro
+
+- Verify ARM delay code
+ (seems to be fairly accurate, 450ns delay is about 480 or so)
+
+- Make colors BLACK and WHITE types/enums
+	Be careful on this as enums are bigger/slower than uint8_t
+	Also consider adding "PIXEL_ON" and "PIXEL_OFF" to simplify color usage. (DONE)
+	Also consider adding a color for "transparent" for DrawBitmapXBM()
+	Also consider adding a color "XOR" which allows drawing, across filled regions. (FUTURE...)
+		This is easy. It only requires updating SetDot() SetPixels().
+	Also consider adding a color "TRANSPARENT" or "PIXEL_CLEAR" which allows leaving pixel alone. (useful for bitmaps)
+
+- update code to use C99 "fast" types: ??
+	uint_fast8_t
+	int_fast8_t
+
+- Add a "width" field to PrintNumber? or obsolete the function completely?
+
+- remove/eliminate FontRead access function ReadPgmData()
+	It is in glcd.cpp but used by gText.cpp
+	This is also used by things that need pgm data like bitmap functions.
+	use a glcdio macro instead?
+
+- Change inheritance  (has implications for doxygen stuff)
+	glcd: gText glcd_device
+	gText: Print
+	glcd_device: (none)
+
+- track down why DrawString() uses 242 bytes of RAM and HelloWorld only uses 94
+	(some of this was debugging in gText.cpp)
+
+- track down why HelloWorld is larger with openGLCD
+	- UNO
+		- 0022  650 bytes larger 
+		- 1.0 6682 vs  6014 (668 bytes)
+		- 1.0.5 6660 vs  5992 (668 bytes)
+	- Teensy2++
+		- 1.0 7788 vs 7128 (660 bytes)
+
+	- Related to emptysketch that includes <openGLCD>
+		~5k of code
+			Seems to go away if PutChar() in write() is commented out.
+			For some reason Print class write() is being drug in.
+
+- eliminate tAS delays on writes? Seems to work on Teensy3
+(didn't make much performance difference, 9.97 to 10.02 FPS)
+
+GLCD issues to solve:
+47 - move SetDisplayMode() from glcd to glcd_device
+53 - e-gizmo gizduino support 
+	http://www.e-gizmo.com/KIT/gizDuino%20X.html
+===========================================================================
+Alternate Ellipse function from:
+https://github.com/krupski/Noritake_VFD_GUU100
+
+void Noritake_VFD_GUU100::drawEllipse (uint8_t xm, uint8_t ym, uint8_t a, uint8_t b, uint8_t on)
+{
+	long x = -a, y = 0; /* II. quadrant from bottom left to top right */
+	long e2 = b, dx = (1 + 2 * x) * e2 * e2; /* error increment */
+	long dy = x * x, err = dx + dy; /* error of 1 step */
+
+	do {
+		setDot (xm - x, ym + y, on); /* I. Quadrant */
+		setDot (xm + x, ym + y, on); /* II. Quadrant */
+		setDot (xm + x, ym - y, on); /* III. Quadrant */
+		setDot (xm - x, ym - y, on); /* IV. Quadrant */
+
+		e2 = 2 * err;
+
+		if (e2 >= dx) {
+			x++;
+			err += dx += 2 * (long) b * b;
+		} /* x step */
+
+		if (e2 <= dy) {
+			y++;
+			err += dy += 2 * (long) a * a;
+		} /* y step */
+
+	} while (x <= 0);
+
+	while (y++ < b) { /* too early stop for flat ellipses with a=1, */
+		setDot (xm, ym + y, on); /* -> finish tip of ellipse */
+		setDot (xm, ym - y, on);
+	}
+}
+===========================================================================
+
+NEW FEATURES:--------------------------------------------------------------
+Some of the new capabilities include:
+Core support:
+- Teensy v3 support
+- Leonardo support
+- Sanguino, Mighty1284p, Bobuino
+- Chipkit support
+- Arduino core code fall back mode so it works on any "Arduino" board.
+
+Device:
+- backlight support (on/off, brightness)
+- enable/disable display (on/off)
+- support for addtional displays:
+ - hd44102 display
+ - sed1520 4GLM12232
+ - sed1520 mt12232d
+ - sed1520 mtb368
+
+Graphics:
+- draw/fill triangles, ellipses
+- X11/XBM bitmap support
+- draw bargraphs DrawHBarGraph/DrawVBarGraph
+
+Text:
+- Additional fonts
+- Render variable fonts with fixed width spacing
+- non padded fonts (allows cp437 fonts)
+- Text overstrike mode
+- get text area properties
+- Set/clear text area mode options
+- Get CharHeight
+- DrawString() with justifications (right, left, center)
+- DrawString() with col/row positioning
+- full support for F() macro (including in pre 1.x IDEs)
+
+Examples:
+- Seperate example for most API functions (Device, Graphics, & Text)
+
+other
+- rename to "openGLCD"
+- DefineArea() - changed return staus (not backward compatible)
+- updated documentation 
+- glcdio much cleaner and more consistent names
+- auto config pin names are now consistent "glcdpinXXX"
+- many functions now return status vs being "void"
+- return status for unsupported capabilities
+- removed seperate revisions for sub classes
+    - one single revision for the "library".
+- many bug fixes
+
+
+---------------------------------------------------------------------------
+
+DONE-------------------------------------------------------------
+- remove revision information for gText and glcd_device
+- openGLCD.h includes <glcd.h>
+- update lcdxxx() macros in glcd_device.cpp
+- update/rename all glcdxxx pin defines to be glcdPinxxx
+	affects:
+		-glcd_device.cpp
+		-include/glcd_io.h
+		-config/*.h
+		-Device/*.h
+- print F_CPU in diags
+
+- Rename device functions to use caps for consistency?
+	on(), off(), display(), noDisplay(), backlight(), noBacklight()
+		OnBacklight(), OffBacklight(), SetBacklight()
+		OnDisplay(), OffDisplay().
+		On(), Off()
+	affects APIexamples
+
+- move glcd.h to include directory
+- rename include/delay.h include/glcd_delay.h
+- rename include/arduino_io.h include/glcd_arduino_io.h ??
+- rename glcd_Config.h to openGLCD_Config.h
+- rename glcd_Buildinfo.h to openGLCD_Buildinfo.h
+- Rename doc/GLCDref.htm doc/openGLCDref.htm
+	Will need to check for references in code and documenation/readme etc...
+- Rename build/doc/doxygen/GLCDref.htm build/doc/doxygen/openGLCDref.htm
+- Rename GetTextProp() to GetAreaProp()  (DONE)
+	- What about SetTextMode() and ClearTextMode() ?? (DONE)
+		Change to SetAreaMode() and ClearAreaMode() ?? (DONE)
+		Backward compatibility???
+		Make SetTexMode() deprecated? (DONE)
+
+- update auto config panel files to use auto config pinconfig header
+	- currently they are doing their own pin config file includes
+- Remove fonts/font12x16.h font (it is not in correct format for library)
+- check all config files for backlight control defines
+	- panel files for backlight control define
+	- pin config file for backlight pin define
+- fix pin order in MEGA config file to match others
+- fix pin order in Sanguino config file to match others
+- add DrawBarGraph() to glcd API ???
+	DrawVBarGraph(x,y, width, height, border, minval, fullval, currval)
+	DrawHBarGraph(x,y, width, height, border, minval, fullval, currval)
+	negative width means width is to left of x
+	negative height means height is above y
+
+	if width negative on DrawHBarGraph graph starts on right and advances to left
+	if width positive on DrawHBarGraph graph starts on left and advances to right
+	if height negative on DrawVBarGraph graph starts a bottom and advances up
+	if height positive on DrawVBarGraph graph starts at top and advances down
+
+- clean up ARM delay code 
+- create a GLCD v3 compatibility header file (done)
+	This will remap/adjust the function parameters of
+	DrawHLine, DrawVLine, DrawRect, DrawRoundRect
+	in the sketch.
+	That way you can translate them to account for the +1
+	pixels when the width/height size changes.
+	Example
+	#define DrawHLine(x, y, width, ...) DrawHLine(x,y, width+1, ##__VA_ARGS)
+	handles optional color with gcc varargs for macros.
+	This way the actual openGLCD code is not modified and the
+	compatibility is done just for the sketch.
+	i.e. something like
+	#include <openGLCD_GLCDv3.h>
+	This header should make GLCDv3 sketches "just work",
+	It will also need dummy values for the GLCD version numbers.
+	It won't work for GLCDdiags since it uses lots of internal stuff.
+- Update photos for diags in doxygen (done)
+- review deprecated stuff (done)
+  It was all removed since there is no
+  deprecated stuff yet. This is a new library.
+  There is a openGLCD_GLCDv3.h compatibilty file.
+
+- add doxygen examples for DrawVBarGraph/DrawHBarGraph in glcd.cpp
+- insert ascii schematic for backlight circuit into examples that use backlight control
+
+- cleanup bitmaps directory (done)
+	- move all non .h files (.bmp, .bmp, .xcf etc) to "images" directory
+
+- FillRect APIexample
+- Remove include/glcd_Deprecated.h ???
+- Arial14 vs Arial_14 inconsistency (can use "Arial14" for font name)
+- check remove/replace all references to ks0108 playground page
+	- definitely in doxygen stuff
+- Remove all references to "ks0108 library"
+	Shows up in doxygen.
+		"previously.... ks0108 library"... etc..
+- compare/sync include/avrio.h to the "official" avrio.h in mcuio
+- make sure mcuio is mentioned in additional resources section
+- verify all widths, heights, for accuracy and consistency
+	-DrawRect - DONE
+	-FillRect - DONE
+	-InvertRect - DONE
+	-DrawVLine - DONE
+	-DrawHLine - DONE
+
+- verify DrawString
+	- handles "bottom" same as normal scrolling (DONE) - padding at bottom
+	- That "center" is correct. (DONE)
+
+- Move around Examples:
+	APIexamples
+	GLCDv3Demos
+		-GLCDv3 ("as is" GLCDv3 code with header changed)
+			-GLCDBigdemo???
+			-GLCDdemo
+			-ks0108example
+		-openGLCD (modified for openGLCD and all platforms)
+			-GLCDBigdemo???
+			-GLCDdemo
+			-ks0108example
+	Demos
+		-life
+		-Rocket
+		-clockFace
+		-BigNums
+		-iFPS (iFPS demo - NEW)
+
+	HelloWorld
+	GLCDdiags
+	Serial2GLCD
+- move debug to build/debug
+- update/cleanup build/debug part of tree
+- FillRoundRect API function
+- updates to build script for 
+#define GLCD_GLCDLIB_REVSTR "DevRev"  // development rev string
+
+- FillCircle() and DrawCircle() are different boundaries. (FIXED)
+ Fill circle is one pixel bigger on the bottom half.
+ ellipse dimensions are 2 * xRad by 2 * yRad (center pixel shared vs extra)
+- trace down progmem / const/ static stuff (DONE)
+	warnings vs errors on AVR vs ARM.
+	using "static" creates warning:
+		'xxx" defined but not used if the var isn't used
+		If you add "const" to it, the warning goes away.
+
+	Creating a dummy reference to the static data will
+	eliminate the warning. If the dummy reference is not referenced
+	the dummy reference and static data is also removed by the linker.
+	i.e create a dummy function that assigns te font/bitmap to a dummy
+	variable.
+
+	on ARM if you don't use "const" then the data is put into RAM.
+	in c++ you have to use "extern" on declaration initialization as well to make a global.
+	if not it is the same as static and will be deleted if the local file does not reference it.
+	Trick is if you want to use the same declaration on C and C++ if you want a local in C
+	you must use 'static' which will then create a local (including with const) for C and C++
+
+	you cannot mix const and non const variables in same section or you get a linker error
+	i.e. if some PROGMEM vars are const and some aren't then it won't link.
+	the dreaded: "varname causes a section type conflict"
+	On ARM if PROGMEM is defined to be nothing, then no error but if const was not
+	used then vars end up in RAM.
+
+
+	Recommendation:
+	- put all openGLCD fonts and bitmaps in their own .progmem section with
+	  FONTDECL and BITMAPDECL
+
+	- define PROGMEM to use .rodata for ARM so that sloppy AVR users can
+	  get their data into flash instead of RAM.
+
+- update font doxygen page to reflect location of
+  of openGLCDFontCreator tool.
+	- Update links to FontCreator2 in doxygen ("Additional Resources")
+		 [ it points to google code glcd-arduino]
+	Will need to point to place in new repository
+
+- Clean up references to SCROLL_UP/SCROLL_DOWN
+- cleanup/remove old font rendering code in gText.cpp
+- cleanup bmp2glcd  (done)
+	- move over under bitmaps/utility? (done)
+- rename config files (done)
+	"Arduino" becomes "Uno" (done)
+	panel: [module]-{glcdChip}_AutoConfig_Panel.h
+	autopinconfig: [module]-{glcdChip}_AutoConfig_Pins.h
+	pinconfig: [module]-{glcdChip}_PinConfig_{BoardType}.h
+	manualconfig: [module]-{glcdchip}_ManualConfig.h
+	[module] name is optional
+
+- update comment in header of pinconfig files (done)
+  to reflect boards it works with.
+
+- add digitalFastxx routines to chipKIT core (done)
+
+- Move extra fonts in "Fonts" subdirectory somewhere else until
+  verified & converted to openGLCD (done)
+
+- Arduino core code fall back mode so it works on any "Arduino" board. (Done)
+- chase down gcc macro expansion issue when using MPIDE (Done)
+	for some reason the pic32 compiler is fully expanding macros
+	when doing stringification.
+	This breaks diags as it can't display pins like A0, A1, etc...
+	They get improperly expanded as their pin #s.
+
+	This is due to chipkit using #defines for A0-An instead of
+	const int declarations. When using #defines the pre-processor
+	recursively replaces the macro to get the final result.
+
+- Arduino core code fall back mode override to force its use? (done)
+
+- update clock demos to extract time from sketch __TIME__/__DATE__ (done)
+
+- remove Streaming.h from include directory (done)
+
+- needs fixes for when user does "import library" of openGLCD (done)
+	FIX: moved compat header to include directory
+	FIX: provided a compat header named glcd.h.compat that can be renamed glcd.h
+
+	This inserts includes for all libraries in the openGLCD root
+	which will cause code to drop back to GLCDv3 mode.
+	possible choices:
+		- move openGLCD_GLCDv3.h to include directory (done)
+			To do this, there could be a define like GLCDCFG_GLCDv3Mode
+			that is used by openGLCD.h to include <include/openGLCD_GLCDv3.h>
+			Sketches that want GLCDv3 compatibilty would simply turn on
+			the defne before including openGLCD.h
+
+			The optional user created glcd.h header would contain:
+			#define GLCDCFG_GLCDv3Mode
+			#include <openGLCD.h>
+
+			Alternatively, rather than an ifdef the sketch could simply
+			include both for compatibility:
+			#include <openGLCD.h>
+			#include <include/openGLCD_GLCDv3.h>
+
+			Seems cleaner to include both as it keeps the openGLCD.h header "pure".
+
+			Note: that this only works if there is NEVER any code in the actual
+			library that changes for GLCDv3 compatibilty, 
+			which is probabaly as it should be.
+
+		- play games with gaurd defines since openGLCD.h is included
+			before openGLCD_GLCDv3.h
+
+- add library name "openGLCD" to build info from build script so openglcd.h header doesn't hard code it
+- add support for Arduino IDE library.properties metadata:
+name=WebServer
+version=1.0
+author=Cristian Maglie <c.maglie@example.com>, Pippo Pluto <pippo@example.com>
+maintainer=Cristian Maglie <c.maglie@example.com>
+sentence=A library that makes coding a Webserver a breeze.
+paragraph=Supports HTTP1.1 and you can do GET and POST.
+category=Communication
+url=http://example.com/
+architectures=avr
+
+- add note to TroubleShooting to check for solder issues on GLCD to header connections
+
+- decide how to handle the writeUTF8() function with doxygen.
+	Should it exist for documention even though it is disabled by default?
+	Should it exist and map to write() or should it not exist to cause a link error.
+	I'm leaning tward a link error when not enabled.
+	SOLUTION: It will ALWAYS exist in documentation but will only exist in code if enabled.
+
+- Fix glcd_Device.cpp getStatus() function to ensure pullups are on.
+	Handled by doing it AVR code as well as portable code.
+	In portable mode, if INPUT_PULLUP is not available, then pullups are not enabled.
+	This shouldn't be an issue since it is only used diring selftest and only comes into
+	play if the module is wired up incorrectly.
+
+- update diags to show glcd config defines.
+	All conig defines are reported
+
+- update/remove googlcode references in the additional resources section.
+Specifically MCUIO and GLCDv3
+
