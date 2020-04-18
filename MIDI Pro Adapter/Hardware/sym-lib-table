@@ -1,0 +1,3 @@
+(sym_lib_table
+  (lib (name mpa)(type Legacy)(uri ${KIPRJMOD}/mpa.lib)(options "")(descr ""))
+)
