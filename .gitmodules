@@ -1,0 +1,6 @@
+[submodule "rockbend/hardware/teensy.pretty"]
+	path = rockbend/hardware/teensy.pretty
+	url = git@github.com:XenGi/teensy.pretty.git
+[submodule "rockbend/hardware/teensy_library"]
+	path = rockbend/hardware/teensy_library
+	url = git@github.com:XenGi/teensy_library.git

@@ -1,0 +1,5 @@
+(sym_lib_table
+  (lib (name teensy)(type Legacy)(uri ${KIPRJMOD}/teensy_library/teensy.lib)(options "")(descr ""))
+  (lib (name rbdrums-rescue)(type Legacy)(uri ${KIPRJMOD}/rbdrums-rescue.lib)(options "")(descr ""))
+  (lib (name rbdrums)(type Legacy)(uri ${KIPRJMOD}/rbdrums.lib)(options "")(descr ""))
+)
